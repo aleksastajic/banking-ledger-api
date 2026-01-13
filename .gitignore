@@ -1,0 +1,18 @@
+# Maven
+/target/
+
+# Maven Wrapper jar should be committed (do not ignore)
+
+# IntelliJ IDEA
+/.idea/
+*.iml
+
+# VS Code
+/.vscode/
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+/logs/
