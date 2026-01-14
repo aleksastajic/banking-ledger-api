@@ -15,7 +15,6 @@ import com.aleksastajic.ledger.ledger.db.LedgerChainHeadRepository;
 import com.aleksastajic.ledger.ledger.db.PostingEntity;
 import com.aleksastajic.ledger.ledger.db.PostingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -89,28 +89,32 @@ public class LedgerWriterImpl implements LedgerWriter {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Journal entry must have at least 2 postings");
         }
 
-        Instant now = Instant.now(clock);
+        // Postgres timestamps are microsecond-precision; hash must be based on the persisted value.
+        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         ParsedPostings parsed = parseAndValidatePostings(request.postings());
 
+        List<LedgerCanonical.CanonicalPosting> canonicalPostings = parsed.postings().stream()
+            .map(p -> new LedgerCanonical.CanonicalPosting(p.accountId(), p.currency(), p.amount(), p.memo()))
+            .toList();
+
         // Canonical request hashing is the single source of truth for idempotency.
-        String requestHash = Sha256.hex(canonicalRequest(clientId, idempotencyKey, request, reversesJournalEntryId, parsed));
+        String requestHash = Sha256.hex(LedgerCanonical.canonicalRequest(
+            clientId,
+            idempotencyKey,
+            request.description(),
+            reversesJournalEntryId,
+            canonicalPostings
+        ));
 
-        IdempotencyRequestEntity idem = new IdempotencyRequestEntity(
-                UUID.randomUUID(),
-                clientId,
-                idempotencyKey,
-                requestHash,
-                HASH_ALGO,
-                null,
-                now
-        );
+        // Avoid relying on catching unique-constraint exceptions: in Postgres, a constraint violation aborts
+        // the current transaction unless rolled back to a savepoint.
+        UUID idemId = UUID.randomUUID();
+        int inserted = idempotencyRequestRepository.insertIfAbsent(idemId, clientId, idempotencyKey, requestHash, HASH_ALGO, now);
 
-        try {
-            idempotencyRequestRepository.saveAndFlush(idem);
-        } catch (DataIntegrityViolationException e) {
+        if (inserted == 0) {
             IdempotencyRequestEntity existing = idempotencyRequestRepository
                     .findByClientIdAndIdempotencyKey(clientId, idempotencyKey)
-                    .orElseThrow(() -> e);
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Idempotency record missing"));
 
             if (!existing.getRequestHash().equals(requestHash)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key reused with a different request");
@@ -131,6 +135,9 @@ public class LedgerWriterImpl implements LedgerWriter {
             );
         }
 
+        IdempotencyRequestEntity idem = idempotencyRequestRepository.findById(idemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Idempotency record missing"));
+
         lockAccountsInStableOrder(parsed.accountIds());
 
         LedgerChainHeadEntity head = chainHeadRepository.findByIdForUpdate(LedgerChainHeadEntity.SINGLETON_ID)
@@ -140,7 +147,14 @@ public class LedgerWriterImpl implements LedgerWriter {
         String prevHash = head.getLastHash();
 
         UUID journalEntryId = UUID.randomUUID();
-        String entryHash = Sha256.hex(canonicalEntry(seqNo, now, request.description(), reversesJournalEntryId, prevHash, parsed));
+        String entryHash = Sha256.hex(LedgerCanonical.canonicalEntry(
+            seqNo,
+            now,
+            request.description(),
+            reversesJournalEntryId,
+            prevHash,
+            canonicalPostings
+        ));
 
         JournalEntryEntity entry = new JournalEntryEntity(
                 journalEntryId,
@@ -255,53 +269,6 @@ public class LedgerWriterImpl implements LedgerWriter {
                 .toList();
 
         return new ParsedPostings(out, accountIds);
-    }
-
-    private static String canonicalRequest(UUID clientId, String idempotencyKey, CreateJournalEntryRequest request, UUID reversesJournalEntryId, ParsedPostings parsed) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("clientId=").append(clientId).append('\n');
-        sb.append("idempotencyKey=").append(escape(idempotencyKey)).append('\n');
-        sb.append("reversesJournalEntryId=").append(reversesJournalEntryId == null ? "" : reversesJournalEntryId).append('\n');
-        sb.append("description=").append(escape(nullToEmpty(request.description()))).append('\n');
-        sb.append("postings_count=").append(parsed.postings().size()).append('\n');
-        for (ParsedPosting p : parsed.postings()) {
-            sb.append("posting=")
-                    .append(p.accountId()).append('|')
-                    .append(p.currency()).append('|')
-                    .append(p.amount().toPlainString()).append('|')
-                    .append(escape(nullToEmpty(p.memo())))
-                    .append('\n');
-        }
-        return sb.toString();
-    }
-
-    private static String canonicalEntry(long seqNo, Instant createdAt, String description, UUID reversesJournalEntryId, String prevHash, ParsedPostings parsed) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("seqNo=").append(seqNo).append('\n');
-        sb.append("createdAt=").append(createdAt).append('\n');
-        sb.append("prevHash=").append(prevHash).append('\n');
-        sb.append("reversesJournalEntryId=").append(reversesJournalEntryId == null ? "" : reversesJournalEntryId).append('\n');
-        sb.append("description=").append(escape(nullToEmpty(description))).append('\n');
-        sb.append("postings_count=").append(parsed.postings().size()).append('\n');
-        for (ParsedPosting p : parsed.postings()) {
-            sb.append("posting=")
-                    .append(p.accountId()).append('|')
-                    .append(p.currency()).append('|')
-                    .append(p.amount().toPlainString()).append('|')
-                    .append(escape(nullToEmpty(p.memo())))
-                    .append('\n');
-        }
-        return sb.toString();
-    }
-
-    private static String nullToEmpty(String s) {
-        return s == null ? "" : s;
-    }
-
-    private static String escape(String s) {
-        return s.replace("\\", "\\\\")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r");
     }
 
     private record ParsedPostings(List<ParsedPosting> postings, List<UUID> accountIds) {

@@ -20,7 +20,7 @@ The service is under active development. Current capabilities:
 - Flyway for schema migrations
 - Spring Data JPA/Hibernate
 - OpenAPI/Swagger via springdoc
-- Testing: JUnit 5 + MockMvc web-slice tests (Testcontainers planned)
+- Testing: JUnit 5 + MockMvc web-slice tests + integration tests against PostgreSQL (external via Docker Compose by default; optional Testcontainers)
 
 ## Project setup
 
@@ -33,6 +33,39 @@ The service is under active development. Current capabilities:
 ```bash
 ./mvnw test
 ```
+
+### Integration tests (PostgreSQL)
+Integration tests (`*IT`) require a PostgreSQL database.
+
+Default (recommended for local dev): run Postgres via Docker Compose and then run ITs:
+```bash
+./scripts/run_with_external_postgres.sh
+```
+
+Or manually:
+```bash
+docker compose up -d db
+./mvnw -Pit verify
+```
+
+Note: `./mvnw verify` (without `-Pit`) skips integration tests by default.
+
+Optional: run ITs using Testcontainers (requires working Docker):
+```bash
+./mvnw -Pit -Dit.useTestcontainers=true verify
+```
+
+Convenience wrapper script (external Postgres by default):
+```bash
+./scripts/run-integration.sh
+```
+
+To force Testcontainers via the wrapper:
+```bash
+USE_TESTCONTAINERS=1 ./scripts/run-integration.sh
+```
+
+`./mvnw test` stays Docker-free; `./mvnw -Pit verify` runs unit tests + `*IT` integration tests.
 
 ### Run
 The application expects a PostgreSQL database (local Docker Compose is the default).
@@ -117,5 +150,10 @@ Migrations are located at:
 ## Next steps
 Upcoming commits add:
 - Integrity hash chain verification
-- Integration tests via Testcontainers (including concurrency and tamper detection)
+- Concurrency and tamper-detection coverage
 - OpenAPI enrichment (examples, schemas, error responses)
+
+## CI
+GitHub Actions workflow is defined in [.github/workflows/ci.yml](.github/workflows/ci.yml) and runs:
+- Unit tests: `./mvnw test`
+- Integration tests: `./mvnw -Pit verify` (against a Postgres service)

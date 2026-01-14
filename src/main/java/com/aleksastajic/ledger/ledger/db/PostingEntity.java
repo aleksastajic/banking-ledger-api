@@ -7,6 +7,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -26,7 +29,8 @@ public class PostingEntity {
     @Column(name = "account_id", nullable = false)
     private UUID accountId;
 
-    @Column(name = "currency", nullable = false, length = 3)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "currency", nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency;
 
     @Column(name = "amount", nullable = false, precision = 19, scale = 4)

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16.11
+        env:
+          POSTGRES_DB: ledger
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ledger"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Wait for Postgres
+        shell: bash
+        run: |
+          for i in {1..60}; do
+            if (echo > /dev/tcp/127.0.0.1/5433) >/dev/null 2>&1; then
+              echo "Postgres is reachable on 5433"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Postgres did not become reachable in time" >&2
+          exit 1
+
+      - name: Unit tests (Docker-free)
+        run: ./mvnw test
+
+      - name: Integration tests (external Postgres)
+        run: ./mvnw -Pit verify

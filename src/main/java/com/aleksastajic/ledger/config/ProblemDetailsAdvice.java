@@ -111,13 +111,21 @@ public class ProblemDetailsAdvice {
             DataIntegrityViolationException ex,
             HttpServletRequest request
     ) {
+        String mostSpecificMessage = ex.getMostSpecificCause() == null ? null : ex.getMostSpecificCause().getMessage();
+        String detail = "Request could not be completed due to a conflict";
+
+        // Provide a stable, user-friendly message for known constraints.
+        if (mostSpecificMessage != null && mostSpecificMessage.contains("journal_entries_reverses_unique")) {
+            detail = "Journal entry has already been reversed";
+        }
+
         return problem(
                 HttpStatus.CONFLICT,
                 ApiProblem.of(
                         TYPE_CONFLICT,
                         "Conflict",
                         HttpStatus.CONFLICT.value(),
-                        "Request could not be completed due to a conflict",
+                        detail,
                         instance(request)
                 )
         );

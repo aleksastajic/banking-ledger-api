@@ -5,6 +5,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,10 +31,12 @@ public class JournalEntryEntity {
     @Column(name = "reverses_journal_entry_id")
     private UUID reversesJournalEntryId;
 
-    @Column(name = "prev_hash", nullable = false, length = 64)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "prev_hash", nullable = false, length = 64, columnDefinition = "char(64)")
     private String prevHash;
 
-    @Column(name = "entry_hash", nullable = false, length = 64)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "entry_hash", nullable = false, length = 64, columnDefinition = "char(64)")
     private String entryHash;
 
     @Column(name = "hash_algo", nullable = false)

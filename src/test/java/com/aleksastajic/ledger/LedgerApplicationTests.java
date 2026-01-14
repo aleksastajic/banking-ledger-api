@@ -2,6 +2,7 @@ package com.aleksastajic.ledger;
 
 import com.aleksastajic.ledger.accounts.AccountRepository;
 import com.aleksastajic.ledger.balances.AccountBalanceService;
+import com.aleksastajic.ledger.integrity.LedgerIntegrityService;
 import com.aleksastajic.ledger.journal.JournalEntryService;
 import com.aleksastajic.ledger.ledger.LedgerWriter;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class LedgerApplicationTests {
 
     @MockBean
     private AccountBalanceService accountBalanceService;
+
+    @MockBean
+    private LedgerIntegrityService ledgerIntegrityService;
 
     @Test
     void contextLoads() {

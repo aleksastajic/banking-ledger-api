@@ -1,6 +1,7 @@
 package com.aleksastajic.ledger.journal;
 
 import com.aleksastajic.ledger.ledger.LedgerWriter;
+import com.aleksastajic.ledger.ledger.db.IdempotencyRequestRepository;
 import com.aleksastajic.ledger.ledger.db.JournalEntryEntity;
 import com.aleksastajic.ledger.ledger.db.JournalEntryRepository;
 import com.aleksastajic.ledger.ledger.db.PostingEntity;
@@ -30,8 +31,14 @@ class JournalEntryServiceReversalTest {
         LedgerWriter ledgerWriter = mock(LedgerWriter.class);
         JournalEntryRepository journalEntryRepository = mock(JournalEntryRepository.class);
         PostingRepository postingRepository = mock(PostingRepository.class);
+        IdempotencyRequestRepository idempotencyRequestRepository = mock(IdempotencyRequestRepository.class);
 
-        JournalEntryService service = new JournalEntryService(ledgerWriter, journalEntryRepository, postingRepository);
+        JournalEntryService service = new JournalEntryService(
+                ledgerWriter,
+                journalEntryRepository,
+                postingRepository,
+                idempotencyRequestRepository
+        );
 
         UUID originalId = UUID.fromString("33333333-3333-3333-3333-333333333333");
         UUID clientId = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -49,6 +56,9 @@ class JournalEntryServiceReversalTest {
         );
 
         when(journalEntryRepository.findById(originalId)).thenReturn(Optional.of(originalEntry));
+        when(idempotencyRequestRepository.findByClientIdAndIdempotencyKey(clientId, idempotencyKey))
+                .thenReturn(Optional.empty());
+        when(journalEntryRepository.existsByReversesJournalEntryId(originalId)).thenReturn(false);
 
         PostingEntity p1 = new PostingEntity(
                 UUID.randomUUID(),
@@ -101,8 +111,14 @@ class JournalEntryServiceReversalTest {
         LedgerWriter ledgerWriter = mock(LedgerWriter.class);
         JournalEntryRepository journalEntryRepository = mock(JournalEntryRepository.class);
         PostingRepository postingRepository = mock(PostingRepository.class);
+        IdempotencyRequestRepository idempotencyRequestRepository = mock(IdempotencyRequestRepository.class);
 
-        JournalEntryService service = new JournalEntryService(ledgerWriter, journalEntryRepository, postingRepository);
+        JournalEntryService service = new JournalEntryService(
+                ledgerWriter,
+                journalEntryRepository,
+                postingRepository,
+                idempotencyRequestRepository
+        );
 
         UUID originalId = UUID.fromString("33333333-3333-3333-3333-333333333333");
         when(journalEntryRepository.findById(originalId)).thenReturn(Optional.empty());
