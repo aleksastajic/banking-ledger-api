@@ -27,11 +27,28 @@ This codebase uses **feature-first packages** (by API domain) with a small share
 - `com.aleksastajic.ledger.api.problem`
   - API error DTOs (Problem Details).
 
+- `com.aleksastajic.ledger.integrity`
+  - Ledger integrity verification service + controller and report model (recomputes canonical entry hashes and validates the chain head).
+
 ## Conventions
 
 - Prefer feature packages (`accounts`, `journal`, …) over global `controller/service/repository` folders.
 - DB mappings live under `ledger.db` because multiple features use the same tables.
 - Keep tests mirroring package names under `src/test/java`.
+
+## Ops / repo layout notes
+
+- `docker-compose.yml` defines a local Postgres service (host port `5433` by default).
+- `src/test/resources/application-it.yml` holds test profile DB defaults used by `-Pit` integration tests.
+- `scripts/` contains convenience wrappers:
+  - `scripts/run_with_external_postgres.sh` — start local Postgres and run `./mvnw -Pit verify`.
+  - `scripts/run-integration.sh` — wrapper to choose external-Postgres (default) or Testcontainers via `USE_TESTCONTAINERS=1`.
+- CI workflow: `.github/workflows/ci.yml` runs unit tests and `-Pit verify` against a Postgres service.
+
+## Testing modes
+
+- Unit/web-slice tests are Docker-free and run via `./mvnw test`.
+- Integration tests (end-to-end) are opt-in via `./mvnw -Pit verify` and by default run against the external Postgres (docker-compose). Testcontainers mode is supported behind `-Dit.useTestcontainers=true`.
 
 ## When to refactor
 
