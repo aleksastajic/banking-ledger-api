@@ -1,6 +1,6 @@
 # banking-ledger-api
 
-Ledger API implementing double-entry accounting primitives using **Java 17**, **Spring Boot 3**, **PostgreSQL**, **Flyway**, and **JPA/Hibernate**.
+Ledger API implementing double-entry accounting primitives targeting **Java 17** (build requires Java 17+), using **Spring Boot 3**, **PostgreSQL**, **Flyway**, and **JPA/Hibernate**.
 
 ## Status
 The service is under active development. Current capabilities:
@@ -42,6 +42,8 @@ Default (recommended for local dev): run Postgres via Docker Compose and then ru
 ./scripts/run_with_external_postgres.sh
 ```
 
+If run directly, this writes a timestamped log file under `logs/`.
+
 Or manually:
 ```bash
 docker compose up -d db
@@ -53,12 +55,14 @@ Note: `./mvnw verify` (without `-Pit`) skips integration tests by default.
 Optional: run ITs using Testcontainers (requires working Docker):
 ```bash
 ./mvnw -Pit -Dit.useTestcontainers=true verify
-```
+If run directly, this writes a timestamped log file under `logs/` (log files are ignored by git; `logs/.gitkeep` keeps the folder).
 
 Convenience wrapper script (external Postgres by default):
 ```bash
 ./scripts/run-integration.sh
 ```
+
+This writes log files under `logs/`.
 
 To force Testcontainers via the wrapper:
 ```bash
@@ -89,7 +93,7 @@ To reset the local database (drops the Docker volume):
 ```bash
 docker compose down -v
 docker compose up -d
-```
+This project targets Java 17 bytecode (`--release 17`) but allows building/running with newer JDKs (e.g. Java 21).
 
 ### 2) Run the app
 ```bash
@@ -131,10 +135,31 @@ Headers required for write endpoints:
 - `X-Client-Id: <uuid>`
 - `Idempotency-Key: <string>`
 
+Idempotency semantics:
+Note: OpenAPI docs are kept up-to-date in controllers.
+- Retrying the same request (same client id + idempotency key + same payload) returns the original `201` response.
+- Reusing the same idempotency key with a different payload returns `409`.
+- For reversals: if an entry was already reversed, subsequent reversal attempts return `409`.
+
 - `POST /journal-entries`
 - `GET /journal-entries/{id}` (includes `reversesJournalEntryId` when applicable)
 - `GET /journal-entries/{id}/postings`
 - `POST /journal-entries/{id}/reversal`
+
+Example: create a journal entry (idempotent)
+```bash
+curl -sS -X POST http://localhost:8080/journal-entries \
+	-H 'Content-Type: application/json' \
+	-H 'X-Client-Id: 11111111-1111-1111-1111-111111111111' \
+	-H 'Idempotency-Key: idem-demo-1' \
+	-d '{
+		"description": "payment",
+		"postings": [
+			{"accountId": "<customer-account-uuid>", "currency": "EUR", "amount": "-10.0000"},
+			{"accountId": "<internal-account-uuid>", "currency": "EUR", "amount": "10.0000"}
+		]
+	}'
+```
 
 ## Flyway migrations
 Migrations are located at:
@@ -148,9 +173,9 @@ Migrations are located at:
 - **Reversals** are explicit: `journal_entries.reverses_journal_entry_id` links a reversal entry to its original, and is included in the canonical hash/idempotency.
 
 ## Next steps
-Upcoming commits add:
-- Integrity hash chain verification
-- Concurrency and tamper-detection coverage
+Potential next improvements:
+- Make Testcontainers mode reliable on all dev machines
+- Tighten/extend business-rule integration tests (edge cases)
 - OpenAPI enrichment (examples, schemas, error responses)
 
 ## CI

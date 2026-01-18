@@ -1,6 +1,11 @@
 package com.aleksastajic.ledger.accounts;
 
+import com.aleksastajic.ledger.api.problem.ApiProblem;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -35,6 +40,14 @@ public class AccountController {
 
     @PostMapping
     @Operation(summary = "Create account")
+        @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Created"),
+            @ApiResponse(
+                responseCode = "400",
+                description = "Bad Request",
+                content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class))
+            )
+        })
     public ResponseEntity<AccountResponse> create(
             @Valid @RequestBody CreateAccountRequest request,
             UriComponentsBuilder uriBuilder
@@ -51,12 +64,28 @@ public class AccountController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get account by id")
+        @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK"),
+            @ApiResponse(
+                responseCode = "404",
+                description = "Not Found",
+                content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class))
+            )
+        })
     public AccountResponse getById(@PathVariable UUID id) {
         return AccountResponse.from(accountService.getById(id));
     }
 
     @GetMapping("/{id}/balances")
     @Operation(summary = "Get account balances")
+        @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK"),
+            @ApiResponse(
+                responseCode = "404",
+                description = "Not Found",
+                content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = ApiProblem.class))
+            )
+        })
     public BalancesResponse getBalances(@PathVariable UUID id) {
         return new BalancesResponse(accountBalanceService.getBalances(id));
     }

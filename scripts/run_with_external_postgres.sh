@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure we fail the script if any piped command fails (e.g., mvn failing under tee).
+set -o pipefail
+
 # Starts postgres via docker-compose, waits for readiness, then runs integration tests (Maven profile `it`).
 cd "$(dirname "$0")/.."
 
@@ -23,6 +26,14 @@ until docker compose exec -T db pg_isready -U postgres -d ledger >/dev/null 2>&1
 done
 
 echo "Running integration tests against external Postgres..."
-./mvnw -Pit verify
+
+if [[ -t 1 ]]; then
+  mkdir -p logs
+  LOG_FILE="logs/it-$(date -u +%Y%m%dT%H%M%SZ).log"
+  echo "Logging to ${LOG_FILE}"
+  ./mvnw -Pit verify 2>&1 | tee "${LOG_FILE}"
+else
+  ./mvnw -Pit verify
+fi
 
 echo "Tests finished. You can stop postgres with: docker compose down"

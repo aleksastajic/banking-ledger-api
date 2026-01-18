@@ -15,4 +15,5 @@
 
 # Logs
 *.log
-/logs/
+logs/*.log
+!logs/.gitkeep
