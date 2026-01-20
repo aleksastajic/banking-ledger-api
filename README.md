@@ -38,6 +38,7 @@ The service is under active development. Current capabilities:
 Integration tests (`*IT`) require a PostgreSQL database.
 
 Default (recommended for local dev): run Postgres via Docker Compose and then run ITs:
+
 ```bash
 ./scripts/run_with_external_postgres.sh
 ```
@@ -45,6 +46,7 @@ Default (recommended for local dev): run Postgres via Docker Compose and then ru
 If run directly, this writes a timestamped log file under `logs/`.
 
 Or manually:
+
 ```bash
 docker compose up -d db
 ./mvnw -Pit verify
@@ -53,18 +55,19 @@ docker compose up -d db
 Note: `./mvnw verify` (without `-Pit`) skips integration tests by default.
 
 Optional: run ITs using Testcontainers (requires working Docker):
+
 ```bash
 ./mvnw -Pit -Dit.useTestcontainers=true verify
-If run directly, this writes a timestamped log file under `logs/` (log files are ignored by git; `logs/.gitkeep` keeps the folder).
+```
 
-Convenience wrapper script (external Postgres by default):
+The convenience wrapper:
+
 ```bash
 ./scripts/run-integration.sh
 ```
 
-This writes log files under `logs/`.
-
 To force Testcontainers via the wrapper:
+
 ```bash
 USE_TESTCONTAINERS=1 ./scripts/run-integration.sh
 ```
@@ -73,6 +76,8 @@ USE_TESTCONTAINERS=1 ./scripts/run-integration.sh
 
 ### Run
 The application expects a PostgreSQL database (local Docker Compose is the default).
+
+Note: `docker compose up` in this repository starts only the `db` (Postgres) service. To access the API and Swagger UI you must also run the Spring Boot application locally (command below) or add an `app` service to `docker-compose.yml`.
 
 ## Quickstart (local dev)
 
@@ -83,16 +88,19 @@ The application expects a PostgreSQL database (local Docker Compose is the defau
 If your system default Java is newer (e.g. Java 21), set `JAVA_HOME` to a Java 17 installation when building/running this project.
 
 ### 1) Start Postgres (Docker)
-We map container port `5432` to host port `5433` by default to avoid conflicts with a local Postgres.
+We map container port `5432` to host port `5433` by default to avoid conflicts with a local Postgres. Override with `POSTGRES_HOST_PORT` if needed.
 
 ```bash
 docker compose up -d
 ```
 
 To reset the local database (drops the Docker volume):
+
 ```bash
 docker compose down -v
 docker compose up -d
+```
+
 This project targets Java 17 bytecode (`--release 17`) but allows building/running with newer JDKs (e.g. Java 21).
 
 ### 2) Run the app
@@ -100,11 +108,19 @@ This project targets Java 17 bytecode (`--release 17`) but allows building/runni
 ./mvnw -q -DskipTests spring-boot:run
 ```
 
+Or build and run the fat jar:
+
+```bash
+./mvnw -DskipTests package
+java -jar target/*-boot.jar --server.port=8080 --spring.datasource.url=jdbc:postgresql://localhost:5433/ledger
+```
+
 ### 3) Verify health
 ```bash
 curl -s http://localhost:8080/actuator/health
 ```
 Expected:
+
 ```json
 {"status":"UP"}
 ```
