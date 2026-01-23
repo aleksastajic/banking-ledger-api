@@ -2,6 +2,19 @@
 
 Ledger API implementing double-entry accounting primitives targeting **Java 17** (build requires Java 17+), using **Spring Boot 3**, **PostgreSQL**, **Flyway**, and **JPA/Hibernate**.
 
+TL;DR
+A Java 17 Spring Boot service demonstrating double-entry accounting primitives with idempotent journal writes, DB‑level invariants, and an integrity hash chain.
+
+## Highlights
+- Idempotent writes: POST /journal-entries uses (X-Client-Id, Idempotency-Key) semantics and returns the original response on retries.
+- Strong invariants: append-only journal/postings, deferred-trigger double-entry checks, and an integrity hash chain to detect tampering.
+- Robust integration tests: Testcontainers-based ITs for idempotency, concurrency, reversals, and integrity checks.
+
+## What I learned
+- Designing idempotency with database-backed records and hashing to ensure safe retries.
+- Using DB triggers and deferred checks to move critical integrity rules into the database.
+- Choosing testing strategies (Testcontainers + CI) to validate concurrency and tampering scenarios.
+
 ## Status
 The service is under active development. Current capabilities:
 - Spring Boot application bootstrap (Maven + Maven Wrapper)
