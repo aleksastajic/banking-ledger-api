@@ -50,5 +50,13 @@ jobs:
       - name: Unit tests (Docker-free)
         run: ./mvnw test
 
-      - name: Integration tests (external Postgres)
-        run: ./mvnw -Pit verify
+      - name: Integration tests (Testcontainers)
+        run: |
+          mkdir -p logs
+          ./mvnw -Pit -Dit.useTestcontainers=true -Ddocker.api.version=1.44 verify | tee logs/ci_mvn_verify_it_$(date -u +%Y%m%dT%H%M%SZ).log
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs
+          path: logs/**

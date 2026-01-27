@@ -48,44 +48,32 @@ The service is under active development. Current capabilities:
 ```
 
 ### Integration tests (PostgreSQL)
-Integration tests (`*IT`) require a PostgreSQL database.
+Integration tests (`*IT`) require a PostgreSQL database. There are two supported runs:
 
-Default (recommended for local dev): run Postgres via Docker Compose and then run ITs:
+- External Postgres (recommended for iterative local development): the helper will start Postgres via Docker Compose, wait for readiness, run ITs and store logs under `logs/`.
 
-```bash
-./scripts/run_with_external_postgres.sh
-```
+	```bash
+	./scripts/run_with_external_postgres.sh
+	```
 
-If run directly, this writes a timestamped log file under `logs/`.
+- Testcontainers (recommended for CI and reproducible environments): runs a real PostgreSQL container per test lifecycle using Testcontainers. The convenience wrapper exports Docker API version when available and captures any Testcontainers-created container logs into `logs/`.
 
-Or manually:
+	Run directly:
 
-```bash
-docker compose up -d db
-./mvnw -Pit verify
-```
+	```bash
+	./mvnw -Pit -Dit.useTestcontainers=true verify
+	```
 
-Note: `./mvnw verify` (without `-Pit`) skips integration tests by default.
+	Or use the wrapper to force Testcontainers mode:
 
-Optional: run ITs using Testcontainers (requires working Docker):
+	```bash
+	USE_TESTCONTAINERS=1 ./scripts/run-integration.sh
+	```
 
-```bash
-./mvnw -Pit -Dit.useTestcontainers=true verify
-```
-
-The convenience wrapper:
-
-```bash
-./scripts/run-integration.sh
-```
-
-To force Testcontainers via the wrapper:
-
-```bash
-USE_TESTCONTAINERS=1 ./scripts/run-integration.sh
-```
-
-`./mvnw test` stays Docker-free; `./mvnw -Pit verify` runs unit tests + `*IT` integration tests.
+Notes:
+- Wrapper output and Maven logs are saved under `logs/` with timestamps.
+- When Testcontainers starts containers, their docker logs are saved into `logs/` with filenames like `testcontainer_<ts>_<name>_<id>.log`.
+- `./mvnw test` remains Docker-free; `./mvnw -Pit verify` runs unit tests and `*IT` integration tests.
 
 ### Run
 The application expects a PostgreSQL database (local Docker Compose is the default).
@@ -208,6 +196,10 @@ Potential next improvements:
 - OpenAPI enrichment (examples, schemas, error responses)
 
 ## CI
-GitHub Actions workflow is defined in [.github/workflows/ci.yml](.github/workflows/ci.yml) and runs:
+GitHub Actions workflow is defined in [.github/workflows/ci.yml](.github/workflows/ci.yml).
+
+What CI does now:
 - Unit tests: `./mvnw test`
-- Integration tests: `./mvnw -Pit verify` (against a Postgres service)
+- Integration tests: runs with Testcontainers enabled (`-Dit.useTestcontainers=true`) and uploads the `logs/` directory as a build artifact for inspection on failure.
+
+If you need CI to run against an externally provided Postgres instance instead, update the workflow accordingly in `.github/workflows/ci.yml`.

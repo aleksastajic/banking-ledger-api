@@ -11,8 +11,33 @@ mkdir -p "$LOG_DIR"
 
 if [[ "$USE_TESTCONTAINERS" == "1" ]]; then
 	echo "Running integration tests with Testcontainers (requires Docker)..."
-	./mvnw -Pit -Dit.useTestcontainers=true verify 2>&1 | tee "$LOG_DIR/mvn_verify_it_testcontainers_${TS}.log"
-	exit ${PIPESTATUS[0]:-0}
+	# Ensure docker-java/Testcontainers sees the server API version
+	if command -v docker >/dev/null 2>&1; then
+		: "${DOCKER_API_VERSION:=$(docker version --format '{{.Server.APIVersion}}' 2>/dev/null || true)}"
+		if [[ -n "${DOCKER_API_VERSION:-}" ]]; then
+			export DOCKER_API_VERSION
+			echo "Exported DOCKER_API_VERSION=$DOCKER_API_VERSION"
+		fi
+	fi
+	./mvnw -Pit -Dit.useTestcontainers=true -Ddocker.api.version=1.44 verify 2>&1 | tee "$LOG_DIR/mvn_verify_it_testcontainers_${TS}.log"
+
+	MVN_EXIT=${PIPESTATUS[0]:-0}
+
+	# If Docker is available, collect logs from Testcontainers-created containers
+	if command -v docker >/dev/null 2>&1; then
+		# containers started by Testcontainers are labeled; collect their logs
+		CONTAINER_IDS=$(docker ps -q --filter "label=org.testcontainers=true" || true)
+		if [[ -n "${CONTAINER_IDS}" ]]; then
+			for cid in $CONTAINER_IDS; do
+				name=$(docker inspect --format '{{.Name}}' "$cid" | sed 's:^/::')
+				out="$LOG_DIR/testcontainer_${TS}_${name}_${cid}.log"
+				echo "Saving docker logs for $name ($cid) to $out"
+				docker logs --since 0 "$cid" >"$out" 2>&1 || true
+			done
+		fi
+	fi
+
+	exit $MVN_EXIT
 fi
 
 echo "Running integration tests against external Postgres (docker compose)..."

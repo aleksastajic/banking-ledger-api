@@ -31,9 +31,17 @@ if [[ -t 1 ]]; then
   mkdir -p logs
   LOG_FILE="logs/it-$(date -u +%Y%m%dT%H%M%SZ).log"
   echo "Logging to ${LOG_FILE}"
-  ./mvnw -Pit verify 2>&1 | tee "${LOG_FILE}"
+  # Export DOCKER_API_VERSION so Testcontainers (if accidentally enabled) negotiates correctly.
+  if command -v docker >/dev/null 2>&1; then
+    : "${DOCKER_API_VERSION:=$(docker version --format '{{.Server.APIVersion}}' 2>/dev/null || true)}"
+    if [[ -n "${DOCKER_API_VERSION:-}" ]]; then
+      export DOCKER_API_VERSION
+      echo "Exported DOCKER_API_VERSION=$DOCKER_API_VERSION"
+    fi
+  fi
+  ./mvnw -Pit -Ddocker.api.version=1.44 verify 2>&1 | tee "${LOG_FILE}"
 else
-  ./mvnw -Pit verify
+  ./mvnw -Pit -Ddocker.api.version=1.44 verify
 fi
 
 echo "Tests finished. You can stop postgres with: docker compose down"
