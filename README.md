@@ -191,8 +191,6 @@ Migrations are located at:
 
 ## Next steps
 Potential next improvements:
-- Make Testcontainers mode reliable on all dev machines
-- Tighten/extend business-rule integration tests (edge cases)
 - OpenAPI enrichment (examples, schemas, error responses)
 
 ## CI
